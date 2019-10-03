@@ -174,19 +174,34 @@ median(resid(Ridge_regression))
 $$Lasso Regression=\sum_{i=1}^{n}(y_i - w_0 - \sum_{j=1}^{p}w_jx_{ij})^2 + \lambda\sum_{j=1}^p|w_j|$$
 2. Create and train model 
 ```{r}
+ctrl =  trainControl(method = "boot", 15)
+
+Lasso_regression <- train(Temp ~ Wind + Month, data = train_regression,
+                          method = 'lasso', trControl= ctrl) 
 
 ```
 
 ```{r}
+Lasso_regression
 ```
 
 Examine the residuals 
 ```{r}
 
 #plot the predicted values vs the observed values
+lasso_test_pred <- predict(Lasso_regression, newdata = test_regression)
+
+#plot the predicted values vs the observed values
+plot_lasso_test_pred <- data.frame(Temp_test_pred = lasso_test_pred, 
+                                   Observed_Temp = test_regression$Temp)
+ggplot(data = plot_lasso_test_pred) +
+  geom_point(aes(x=Observed_Temp, y = Temp_test_pred)) + 
+  ggtitle("True Temp Value vs Predicted Temp Value Lasso Regression") +
+  theme_bw()
 
 
 #median residual value should be close to zero
+median(resid(Ridge_regression))
 ```
 
 
@@ -418,10 +433,66 @@ ggplot(data = test_classifier_log) +
 #libra
 #train
 #test
+library(mlbench)
+data("BreastCancer")
+```
+
+```{r}
 
 ##ctrl <- trainControl()
 ## <- train(, data = , method = "", trControl = ctrl)
 ## predict(, newdata="")
+```
+
+```{r}
+#split into training and test set 
+train_size <- floor(0.75 * nrow(BreastCancer))
+set.seed(543)
+train_pos <- sample(seq_len(nrow(BreastCancer)), size = train_size)
+train_classifier <- BreastCancer[train_pos,]
+test_classifier <- BreastCancer[-train_pos,]
+
+
+dim(train_classifier)
+dim(test_classifier)
+#only look at two classes 
+train_classifier_log <- train_classifier[c(which(train_classifier$Class == "benign"),
+                                           which(train_classifier$Class == "malignant")),]
+test_classifier_log <- test_classifier[c(which(test_classifier$Class == "benign"), 
+                                         which(test_classifier$Class == "malignant")),]
+
+train_classifier_log$Class <- factor(train_classifier_log$Class)
+test_classifier_log$Class <- factor(test_classifier_log$Class)
+
+ctrl <- trainControl(method = "repeatedcv", repeats = 15,classProbs = T,
+                     savePredictions = T)
+```
+```{r}
+logistic_regression <- train(Class ~ Cell.shape , data = train_classifier_log, 
+                             method = "glm", family= "binomial", trControl = ctrl)
+
+logistic_regression
+```
+```{r}
+plot(x = roc(predictor = logistic_regression$pred$benign,
+             response = logistic_regression$pred$obs)$specificities, 
+     y = roc(predictor = logistic_regression$pred$benign, 
+             response = logistic_regression$pred$obs)$sensitivities,
+     col= "blue", xlim = c(1, 0), type ="l", ylab = "Sensitivity",
+     xlab = "Specificity")
+legend("bottomright", legend = paste("benign v malignant --", 
+                                     roc(predictor = logistic_regression$pred$benign,
+                                         response = logistic_regression$pred$obs)$auc
+, sep = ""), col = c("blue"), fill = c("blue"))
+```
+```{r}
+#predict iris species using Sepal legth
+logistic_regression_predict_class <- predict(logistic_regression, 
+                                             newdata = test_classifier_log)
+
+#confusion matrix
+confusionMatrix(logistic_regression_predict_class, 
+                reference = test_classifier_log$Class)
 ```
 
 
